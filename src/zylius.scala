@@ -3,12 +3,20 @@ import scala.collection.mutable.{ HashMap => MutableHashMap }
 
 object ControlFunction
 {
-  val goodForGoing = List('P', 'M', '_', 'B', '?')
+  val goodForGoing = List('P', 'M', '_', 'B', '?', 'S')
   val goodForHunting = List('B', 'P')
 
   def forMaster(bot: Bot) {
-    var headingChoice = bot.view.offsetToNearestInList(goodForHunting)
+    val dontFireDefensiveMissileUntil = bot.inputAsIntOrElse("dontFireDefensiveMissileUntil", -1)
+    val nearestEnemySlave = bot.view.offsetToNearestInList(List('b'))
+    val numOfBots = bot.view.cells.filter(_ == 'S').length
+    val numOfEnemies = bot.view.cells.filter(_ == 'b').length
+    if(dontFireDefensiveMissileUntil < bot.time && bot.energy > 100 && nearestEnemySlave.toString != "None" && numOfBots < numOfEnemies) { // fire defensive missile?
+        bot.spawn(XY.apply(bot.view.relPosFromAbsPos(XY.apply(nearestEnemySlave.toString)).toString), "target" -> nearestEnemySlave)
+        bot.set("dontFireDefensiveMissileUntil" -> (bot.time + 1))
+    }
 
+    var headingChoice = bot.view.offsetToNearestInList(goodForHunting)
     var randomHeadingChoice = '_'
     if(headingChoice.toString == "None") {
       if(math.random < 0.5) randomHeadingChoice = '_' else randomHeadingChoice = '?'
@@ -17,85 +25,36 @@ object ControlFunction
       headingChoice = bot.view.offsetToFurthest(if (randomHeadingChoice == '_') '?' else '_')
     }
     var heading = XY.apply(headingChoice.toString)
-
-
-    val g = new Graph()
-    var id = 0
-    var start = new g.Node
-    var target = None: Option[g.Node]
-    var newNode = new g.Node
     val targetIndex = bot.view.indexFromRelPos(heading)
 
-    for(item <- bot.view.cells) {
-      newNode = g.addNode()
-
-      if(goodForGoing.contains(item)) {
-        // Item to the left
-        if (id % 31 != 0) {
-          val leftItem = id - 1
-          if(goodForGoing.contains(bot.view.cells(leftItem))) {
-            g.nodes(leftItem).connectWith(newNode)
-            newNode.connectWith(g.nodes(leftItem))
-            //bot.log("[Left] Connecting: " + id + " with " + leftItem)
-          }
-        }
-
-        // Upper items
-        if (id > 30) {
-          // Upper.
-          val upperItem = id - 31
-          if(goodForGoing.contains(bot.view.cells(upperItem))) {
-            g.nodes(upperItem).connectWith(newNode)
-            newNode.connectWith(g.nodes(upperItem))
-            //bot.log("[Upper] Connecting: " + id + " with " + upperItem)
-          }
-
-          // Up-right.
-          if(id % 31 != 30) {
-            val upRightItem = id - 30
-            if(goodForGoing.contains(bot.view.cells(upRightItem))) {
-              g.nodes(upRightItem).connectWith(newNode)
-              newNode.connectWith(g.nodes(upRightItem))
-              //bot.log("[Up-right] Connecting: " + id + " with " + upRightItem)
-            }
-          }
-
-          // Up-left.
-          if(id % 31 != 0) {
-            val upLeftItem = id - 32
-            if(goodForGoing.contains(bot.view.cells(upLeftItem))) {
-              g.nodes(upLeftItem).connectWith(newNode)
-              newNode.connectWith(g.nodes(upLeftItem))
-              //bot.log("[Up-left] Connecting: " + id + " with " + upLeftItem + "\n\n")
-            }
-          }
-        }
-      }
-
-      if(id == 480) {
-        start = newNode
-       // bot.log("Start " + id)
-      }
-      if(id == targetIndex) {
-        target = Some(newNode)
-        //bot.log("Target " + id)
-      }
-      id = id + 1
-    }
-
-    if(!target.isEmpty) {
-      val tTarget = target.getOrElse(new g.Node)
-      val dijkstra = new Dijkstra(g)
-      val (_, path) = dijkstra.compute(start, tTarget)
-      val shortest = dijkstra.findShortestPathToTarget(start, tTarget, path)
+    try {
+      val shortest = bot.view.findPath(targetIndex)
       heading = XY.apply(bot.view.relPosFromIndex(shortest(1).toInt).toString)
       bot.move(bot.inputAsXYOrElse("heading", heading))
-      bot.status("S: [" + bot.view.cellAtRelPos(heading) + "] " + heading.toString + ". H: [" + bot.view.cellAtRelPos(XY.apply(headingChoice.toString)) + "] " + headingChoice.toString + ".")
+      bot.status("S:[" + bot.view.cellAtRelPos(heading) + "] " + heading.toString + "H:[" + bot.view.cellAtRelPos(XY.apply(headingChoice.toString)) + "]" + headingChoice.toString + ".")
+    } catch {
+      case e: Exception => bot.move(XY.apply(0, 0))
     }
   }
 
-  def forSlave(bot: Bot) {
-
+  def forSlave(bot: MiniBot) {
+    try {
+      val headingChoice = XY.apply(bot.view.offsetToNearestInList(List('b')).toString)
+      val targetIndex = bot.view.indexFromRelPos(headingChoice)
+      val shortest = bot.view.findPath(targetIndex)
+      if(shortest.length < 4) {
+        bot.explode(4)
+      } else {
+        val heading = XY.apply(bot.view.relPosFromIndex(shortest(1).toInt).toString)
+        bot.move(bot.inputAsXYOrElse("heading", heading))
+        //bot.status("S:[" + bot.view.cellAtRelPos(heading) + "] " + heading.toString + "H:[" + bot.view.cellAtRelPos(XY.apply(headingChoice.toString)) + "]" + headingChoice.toString + ".")
+      }
+    } catch {
+      case e: Exception => {
+       val message = e.getMessage()
+       bot.move(XY.apply(0, 0))
+      }
+    }
   }
 }
 
@@ -479,6 +438,11 @@ object Direction90 {
 
 
 case class View(cells: String) {
+
+  val goodForGoing = List('P', 'M', '_', 'B', '?', 'S')
+  val goodForHunting = List('B', 'P')
+  val goodForGoingBot = List('P', 'M', '_', 'B', '?', 'S', 'b')
+
   val size = math.sqrt(cells.length).toInt
   val center = XY(size / 2, size / 2)
 
@@ -522,6 +486,73 @@ case class View(cells: String) {
       val nearest = matchingXY.map(p => relPosFromIndex(p._2)).maxBy(_.length)
       nearest
     }
+  }
+
+  def findPath(targetIndex: Int) = {
+    val g = new Graph()
+    var start = new g.Node
+    var target = None: Option[g.Node]
+    var newNode = new g.Node
+    val going = if(size == 21) goodForGoingBot else goodForGoing
+    for((item, id) <- cells.zipWithIndex) {
+      newNode = g.addNode()
+
+      if(going.contains(item)) {
+        // Item to the left
+        if (id % size != 0) {
+          val leftItem = id - 1
+          if(goodForGoing.contains(cells(leftItem))) {
+            g.nodes(leftItem).connectWith(newNode)
+            newNode.connectWith(g.nodes(leftItem))
+            //bot.log("[Left] Connecting: " + id + " with " + leftItem)
+          }
+        }
+
+        // Upper items
+        if (id > (size - 1)) {
+          // Upper.
+          val upperItem = id - size
+          if(goodForGoing.contains(cells(upperItem))) {
+            g.nodes(upperItem).connectWith(newNode)
+            newNode.connectWith(g.nodes(upperItem))
+            //bot.log("[Upper] Connecting: " + id + " with " + upperItem)
+          }
+
+          // Up-right.
+          if(id % size != (size - 1)) {
+            val upRightItem = id - (size - 1)
+            if(goodForGoing.contains(cells(upRightItem))) {
+              g.nodes(upRightItem).connectWith(newNode)
+              newNode.connectWith(g.nodes(upRightItem))
+              //bot.log("[Up-right] Connecting: " + id + " with " + upRightItem)
+            }
+          }
+
+          // Up-left.
+          if(id % size != 0) {
+            val upLeftItem = id - (size + 1)
+            if(goodForGoing.contains(cells(upLeftItem))) {
+              g.nodes(upLeftItem).connectWith(newNode)
+              newNode.connectWith(g.nodes(upLeftItem))
+              //bot.log("[Up-left] Connecting: " + id + " with " + upLeftItem + "\n\n")
+            }
+          }
+        }
+      }
+
+      if(id == (size/2)*(size+1)) {
+        start = newNode
+        // bot.log("Start " + id)
+      }
+      if(id == targetIndex) {
+        target = Some(newNode)
+        //bot.log("Target " + id)
+      }
+    }
+    val tTarget = target.getOrElse(new g.Node)
+    val dijkstra = new Dijkstra(g)
+    val (distance, path) = dijkstra.compute(start, tTarget)
+    dijkstra.findShortestPathToTarget(start, tTarget, path)
   }
 }
 

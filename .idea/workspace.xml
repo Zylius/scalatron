@@ -68,9 +68,20 @@
       <file leaf-file-name="zylius.scala" pinned="false" current="true" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/zylius.scala">
           <provider selected="true" editor-type-id="text-editor">
-            <state line="175" column="5" selection-start="5404" selection-end="5404" vertical-scroll-proportion="-0.35951662" vertical-offset="3213" max-vertical-offset="9061">
+            <state line="56" column="5" selection-start="2734" selection-end="2734" vertical-scroll-proportion="0.8680556" vertical-offset="452" max-vertical-offset="9588">
               <folding>
                 <element signature="e#0#61#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="Int.scala" pinned="false" current="false" current-in-tab="false">
+        <entry file="jar://C:/scala-2.10.2/src/scala-library-src.jar!/scala/Int.scala">
+          <provider selected="true" editor-type-id="text-editor">
+            <state line="21" column="21" selection-start="994" selection-end="994" vertical-scroll-proportion="-9.16" vertical-offset="26" max-vertical-offset="10778">
+              <folding>
+                <element signature="n#!!doc" expanded="false" />
               </folding>
             </state>
           </provider>
@@ -467,11 +478,11 @@
       <window_info id="Palette" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
-      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.27" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
+      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.27" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Messages" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.20666666" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
+      <window_info id="Messages" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.20666666" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Maven Projects" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
@@ -578,9 +589,18 @@
         </state>
       </provider>
     </entry>
+    <entry file="jar://C:/scala-2.10.2/src/scala-library-src.jar!/scala/Int.scala">
+      <provider selected="true" editor-type-id="text-editor">
+        <state line="21" column="21" selection-start="994" selection-end="994" vertical-scroll-proportion="-9.16" vertical-offset="26" max-vertical-offset="10778">
+          <folding>
+            <element signature="n#!!doc" expanded="false" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/src/zylius.scala">
       <provider selected="true" editor-type-id="text-editor">
-        <state line="175" column="5" selection-start="5404" selection-end="5404" vertical-scroll-proportion="-0.35951662" vertical-offset="3213" max-vertical-offset="9061">
+        <state line="56" column="5" selection-start="2734" selection-end="2734" vertical-scroll-proportion="0.8680556" vertical-offset="452" max-vertical-offset="9588">
           <folding>
             <element signature="e#0#61#0" expanded="true" />
           </folding>
