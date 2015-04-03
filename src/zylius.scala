@@ -1,4 +1,6 @@
-import scala.collection.mutable._
+import scala.collection.mutable.{ HashSet => MutableHashSet }
+import scala.collection.mutable.{ HashMap => MutableHashMap }
+
 object ControlFunction
 {
   val goodForGoing = List('P', 'M', '_', 'B', '?')
@@ -17,15 +19,15 @@ object ControlFunction
     var heading = XY.apply(headingChoice.toString)
 
 
-    val g = new WeightedGraph(1)
+    val g = new Graph()
     var id = 0
     var start = new g.Node
     var target = None: Option[g.Node]
     var newNode = new g.Node
-
     val targetIndex = bot.view.indexFromRelPos(heading)
+
     for(item <- bot.view.cells) {
-      newNode = g.addNode
+      newNode = g.addNode()
 
       if(goodForGoing.contains(item)) {
         // Item to the left
@@ -83,24 +85,13 @@ object ControlFunction
 
     if(!target.isEmpty) {
       val tTarget = target.getOrElse(new g.Node)
-      val dijkstra = new Dijkstra[g.type](g)
-      val (distance, path) = dijkstra.compute(start, tTarget)
-      val shortest = printResult[g.type](start, tTarget, distance, path, bot)
+      val dijkstra = new Dijkstra(g)
+      val (_, path) = dijkstra.compute(start, tTarget)
+      val shortest = dijkstra.findShortestPathToTarget(start, tTarget, path)
       heading = XY.apply(bot.view.relPosFromIndex(shortest(1).toInt).toString)
       bot.move(bot.inputAsXYOrElse("heading", heading))
       bot.status("S: [" + bot.view.cellAtRelPos(heading) + "] " + heading.toString + ". H: [" + bot.view.cellAtRelPos(XY.apply(headingChoice.toString)) + "] " + headingChoice.toString + ".")
     }
-  }
-
-  def printResult[G <: Graph](start: G#Node, target: G#Node, distance: Map[G#Node, Int], path: Map[G#Node, G#Node], bot: Bot): List[G#Node] = {
-    bot.log("Got target: " + target.toString)
-    var shortest = List(target)
-    while(shortest.head != start) {
-      shortest ::= path(shortest.head)
-    }
-    bot.log("Shortest-path cost: " + distance(target))
-    bot.log("Shortest-path: " + shortest.mkString(" -> "))
-    shortest
   }
 
   def forSlave(bot: Bot) {
@@ -108,6 +99,107 @@ object ControlFunction
   }
 }
 
+class Graph {
+  var nodes: List[Node] = Nil
+  var edges: List[Edge] = Nil
+
+  class Node{
+    def connectWith(node: Node): Edge = {
+      val edge = newEdge(this, node)
+      edges = edge :: edges
+      edge
+    }
+    override def toString:String = this.toInt.toString
+    def toInt:Int = nodes.indexOf(this)
+  }
+
+  class Edge(one: Node, other: Node)  {
+    def a = one
+    def b = other
+    override def toString:String = one.toString + " -> " + other.toString
+    def opposite(n: Node): Option[Node] =
+      if(n == a) Some(b)
+      else if(n == b) Some(a)
+      else None
+  }
+
+  def newNode(): Node = new Node
+  def newEdge(one: Node, other: Node): Edge = new Edge(one, other)
+  def addNode(): Node = {
+    val node = newNode()
+    nodes = nodes :+ node
+    node
+  }
+}
+
+class Dijkstra(graph: Graph) {
+  type Node = Graph#Node
+  type Edge = Graph#Edge
+
+  def compute(start: Node, target: Node): (MutableHashMap[Node, Int], MutableHashMap[Node, Node]) = {
+    var queue: MutableHashSet[Node] = new MutableHashSet[Node]()
+    var settled: MutableHashSet[Node] = new MutableHashSet()
+    val distance: MutableHashMap[Node, Int] = new MutableHashMap()
+    val path: MutableHashMap[Node, Node] = new MutableHashMap()
+    queue += start
+    distance(start) = 0
+
+    def executeQueue(cond : => Boolean) : Unit = {
+      if(cond) {
+        val u = extractMinimum(queue, distance)
+        settled += u
+        relaxNeighbors(u, queue, settled, distance, path)
+        executeQueue(cond)
+      }
+    }
+
+    executeQueue(!queue.isEmpty)
+
+    (distance, path)
+  }
+
+  /**
+   * Finds element of Q with minimum value in D, removes it
+   * from Q and returns it.
+   */
+  protected def extractMinimum[T](Q: MutableHashSet[T], D: MutableHashMap[T, Int]): T = {
+    var u = Q.first
+    Q.foreach((node) =>  if(D(u) > D(node)) u = node)
+    Q -= u
+    u
+  }
+
+  /**
+   * For all nodes <code>v</code> not in <code>S</code>, neighbors of
+   * <code>u</code>}: Updates shortest distances and paths, if shorter than
+   * the previous value.
+   */
+  protected def relaxNeighbors(u: Node, Q: MutableHashSet[Node], S: MutableHashSet[Node],
+                               D: MutableHashMap[Node, Int], P: MutableHashMap[Node, Node]): Unit = {
+    for(edge <- graph.edges.filter(x => x.a == u || x.b == u)) {
+      var v = if(edge.a == u) edge.b else edge.a
+      if(!S.contains(v)) {
+        if(!D.contains(v) || D(v) > D(u) + 1) {
+          D(v) = D(u) + 1
+          P(v) = u
+          Q += v
+        }
+      }
+    }
+  }
+
+  def findShortestPathToTarget(start: Graph#Node, target: Graph#Node, path: MutableHashMap[Graph#Node, Graph#Node]):  List[Graph#Node] = {
+    var shortest = List(target)
+    def buildShortest(cond : => Boolean) : Unit = {
+      if(cond) {
+        shortest ::= path(shortest.head)
+        buildShortest(cond)
+      }
+    }
+    buildShortest(shortest.head != start)
+    shortest
+  }
+}
 
 // -------------------------------------------------------------------------------------------------
 // Framework
@@ -433,143 +525,3 @@ case class View(cells: String) {
   }
 }
 
-abstract class Graph {
-  type Edge <: IEdge
-  type Node <: INode
-  abstract class INode {
-    def connectWith(node: Node): Edge
-  }
-  abstract class IEdge {
-    def a: Node
-    def b: Node
-    def opposite(n: Node): Option[Node]
-  }
-  def nodes: List[Node]
-  def edges: List[Edge]
-  def addNode: Node
-}
-
-abstract class UndirectedGraph extends Graph {
-  class EdgeImpl(one: Node, other: Node) extends IEdge {
-    def a = one
-    def b = other
-    def opposite(n: Node): Option[Node] =
-      if(n == a) Some(b)
-      else if(n == b) Some(a)
-      else None
-  }
-
-  class NodeImpl extends INode {
-    this: Node =>
-    def connectWith(node: Node): Edge = {
-      val edge = newEdge(this, node)
-      edges = edge :: edges;
-      edge
-    }
-    override def toString:String = (nodes.indexOf(this)).toString()
-    def toInt:Int = (nodes.indexOf(this))
-  }
-
-  protected def newNode: Node
-  protected def newEdge(one: Node, other: Node): Edge
-
-  var nodes: List[Node] = Nil
-  var edges: List[Edge] = Nil
-
-  def addNode: Node = {
-    val node = newNode
-    nodes = nodes :+ node
-    node
-  }
-}
-
-class ConcreteUndirectedGraph extends UndirectedGraph {
-  type Node = NodeImpl
-  type Edge = EdgeImpl
-  protected def newNode: Node = new Node
-  protected def newEdge(one: Node, other: Node): Edge =
-    new Edge(one, other)
-}
-
-class WeightedGraph(defaultWeight: Int) extends UndirectedGraph {
-  type Node = NodeImpl
-  type Edge = EdgeImpl with Weight
-
-  trait Weight {
-    var weight = defaultWeight
-    def getWeight = weight
-    def setWeight(weight: Int): Unit = {
-      this.weight = weight
-    }
-  }
-  override protected def newNode: Node = new NodeImpl
-  override protected def newEdge(one: Node, other: Node): Edge with Weight =
-    new EdgeImpl(one, other) with Weight
-}
-
-class Dijkstra[G <: WeightedGraph](graph: G) {
-  type Node = G#Node
-  type Edge = G#Edge
-  /**
-   * StopCondition provides a way to terminate the algorithm at a certain
-   * point, e.g.: When target becomes settled.
-   */
-  type StopCondition = (Set[Node], Map[Node, Int], Map[Node, Node])
-    => Boolean
-
-  /**
-   * By default the Dijkstra algorithm processes all nodes reachable from
-   * <code>start</code> given to <code>compute()</code>.
-   */
-  val defaultStopCondition: StopCondition = (_, _, _) => true
-  var stopCondition = defaultStopCondition
-
-  def compute(start: Node, target: Node):
-  (Map[Node, Int], Map[Node, Node]) = {
-    var queue: Set[Node] = new HashSet()
-    var settled: Set[Node] = new HashSet()
-    var distance: Map[Node, Int] = new HashMap()
-    var path: Map[Node, Node] = new HashMap()
-    queue += start
-    distance(start) = 0
-
-    while(!queue.isEmpty && stopCondition(settled, distance, path)) {
-      val u = extractMinimum(queue, distance)
-      settled += u
-      relaxNeighbors(u, queue, settled, distance, path)
-    }
-
-    return (distance, path)
-  }
-
-  /**
-   * Finds element of Q with minimum value in D, removes it
-   * from Q and returns it.
-   */
-  protected def extractMinimum[T](Q: Set[T], D: Map[T, Int]): T = {
-    var u = Q.first
-    Q.foreach((node) =>  if(D(u) > D(node)) u = node)
-    Q -= u
-    return u;
-  }
-
-  /**
-   * For all nodes <code>v</code> not in <code>S</code>, neighbors of
-   * <code>u</code>}: Updates shortest distances and paths, if shorter than
-   * the previous value.
-   */
-  protected def relaxNeighbors(u: Node, Q: Set[Node], S: Set[Node],
-                               D: Map[Node, Int], P: Map[Node, Node]): Unit = {
-    for(edge <- graph.edges if(edge.a == u || edge.b == u) ) {
-      var v = if(edge.a == u) edge.b else edge.a
-      if(!S.contains(v)) {
-        if(!D.contains(v) || D(v) > D(u) + edge.getWeight) {
-          D(v) = D(u) + edge.getWeight
-          P(v) = u
-          Q += v
-        }
-      }
-    }
-
-  }
-}
