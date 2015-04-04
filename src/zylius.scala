@@ -8,13 +8,6 @@ object ControlFunction
 
   def forMaster(bot: Bot) {
     val dontFireDefensiveMissileUntil = bot.inputAsIntOrElse("dontFireDefensiveMissileUntil", -1)
-    val nearestEnemySlave = bot.view.offsetToNearestInList(List('b'))
-    val numOfBots = bot.view.cells.filter(_ == 'S').length
-    val numOfEnemies = bot.view.cells.filter(_ == 'b').length
-    if(dontFireDefensiveMissileUntil < bot.time && bot.energy > 100 && nearestEnemySlave.toString != "None" && numOfBots < numOfEnemies) { // fire defensive missile?
-        bot.spawn(XY.apply(bot.view.relPosFromAbsPos(XY.apply(nearestEnemySlave.toString)).toString), "target" -> nearestEnemySlave)
-        bot.set("dontFireDefensiveMissileUntil" -> (bot.time + 1))
-    }
 
     var headingChoice = bot.view.offsetToNearestInList(goodForHunting)
     var randomHeadingChoice = '_'
@@ -28,12 +21,26 @@ object ControlFunction
     val targetIndex = bot.view.indexFromRelPos(heading)
 
     try {
-      val shortest = bot.view.findPath(targetIndex)
+      val (shortest, distance, path) = bot.view.findPath(targetIndex)
       heading = XY.apply(bot.view.relPosFromIndex(shortest(1).toInt).toString)
       bot.move(bot.inputAsXYOrElse("heading", heading))
-      bot.status("S:[" + bot.view.cellAtRelPos(heading) + "] " + heading.toString + "H:[" + bot.view.cellAtRelPos(XY.apply(headingChoice.toString)) + "]" + headingChoice.toString + ".")
+      bot.status("S:[" + bot.view.cellAtRelPos(heading) + "] H:[" + bot.view.cellAtRelPos(XY.apply(headingChoice.toString)) + "]" + headingChoice.toString + ".")
     } catch {
       case e: Exception => bot.move(XY.apply(0, 0))
+    }
+
+    try {
+      val nearestEnemySlave = bot.view.offsetToNearestInList(List('b'))
+      val numOfMinions = bot.view.cells.filter(_ == 'S').length
+      val (_, botDistances, _) = bot.view.findPath(220, forceBot = true)
+      val enemies = bot.view.getIndexes('b')
+      val distancesToEnemies = botDistances.filter(x => enemies.contains(x._1.toInt) && x._2 < 11)
+      if(dontFireDefensiveMissileUntil < bot.time && bot.energy > 100 && nearestEnemySlave.toString != "None" && numOfMinions < distancesToEnemies.size) {
+        bot.spawn(XY.apply(bot.view.relPosFromAbsPos(XY.apply(nearestEnemySlave.toString)).toString))
+        bot.set("dontFireDefensiveMissileUntil" -> (bot.time + 1))
+      }
+    } catch {
+      case e: Exception =>
     }
   }
 
@@ -41,19 +48,16 @@ object ControlFunction
     try {
       val headingChoice = XY.apply(bot.view.offsetToNearestInList(List('b')).toString)
       val targetIndex = bot.view.indexFromRelPos(headingChoice)
-      val shortest = bot.view.findPath(targetIndex)
+      val (shortest, _, _) = bot.view.findPath(targetIndex)
       if(shortest.length < 4) {
-        bot.explode(4)
+        bot.explode(3)
       } else {
         val heading = XY.apply(bot.view.relPosFromIndex(shortest(1).toInt).toString)
         bot.move(bot.inputAsXYOrElse("heading", heading))
-        //bot.status("S:[" + bot.view.cellAtRelPos(heading) + "] " + heading.toString + "H:[" + bot.view.cellAtRelPos(XY.apply(headingChoice.toString)) + "]" + headingChoice.toString + ".")
+        bot.status("S:[" + bot.view.cellAtRelPos(heading) + "]H:[" + bot.view.cellAtRelPos(XY.apply(headingChoice.toString)) + "]" + headingChoice.toString + ".")
       }
     } catch {
-      case e: Exception => {
-       val message = e.getMessage()
-       bot.move(XY.apply(0, 0))
-      }
+      case e: Exception => bot.move(XY.apply(0, 0))
     }
   }
 }
@@ -468,6 +472,11 @@ case class View(cells: String) {
     }
   }
 
+  def getIndexes(char: Char) =
+    cells.zipWithIndex.filter(
+      _._1 == char
+    ).unzip._2
+
   def offsetToNearestInList(chars: List[Char]) = {
     val matchingXY = cells.view.zipWithIndex.filter(x => chars.contains(x._1))
     if( matchingXY.isEmpty )
@@ -488,12 +497,12 @@ case class View(cells: String) {
     }
   }
 
-  def findPath(targetIndex: Int) = {
+  def buildGraph(targetIndex: Int, forceBot: Boolean = false) = {
     val g = new Graph()
     var start = new g.Node
     var target = None: Option[g.Node]
     var newNode = new g.Node
-    val going = if(size == 21) goodForGoingBot else goodForGoing
+    val going = if(size == 21 || forceBot) goodForGoingBot else goodForGoing
     for((item, id) <- cells.zipWithIndex) {
       newNode = g.addNode()
 
@@ -549,10 +558,15 @@ case class View(cells: String) {
         //bot.log("Target " + id)
       }
     }
+
+    (g, start, target)
+  }
+  def findPath(targetIndex: Int, forceBot: Boolean = false) = {
+    val (g, start, target) = this.buildGraph(targetIndex, forceBot)
     val tTarget = target.getOrElse(new g.Node)
     val dijkstra = new Dijkstra(g)
     val (distance, path) = dijkstra.compute(start, tTarget)
-    dijkstra.findShortestPathToTarget(start, tTarget, path)
+    (dijkstra.findShortestPathToTarget(start, tTarget, path), distance, path)
   }
 }
 
