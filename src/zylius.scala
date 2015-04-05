@@ -30,10 +30,10 @@ object ControlFunction
 
       val numOfMinions = bot.view.cells.filter(_ == 'S').length
       val enemies = bot.view.getIndexes(enemyEntities)
-      val distancesToEnemies = botDistances.filter(x => enemies.contains(x._1.toInt - 1) && x._2 < 11)
+      val distancesToEnemies = botDistances.filter(x => enemies.contains(x._1.toInt - 1))
       if(dontFireDefensiveMissileUntil < bot.time && bot.energy > 100 && numOfMinions < distancesToEnemies.size && distancesToEnemies.size > 0) {
         val minionHeading = XY.apply(bot.view.relPosFromIndex(distancesToEnemies.unzip._1.head.toInt).toString)
-        bot.spawn(minionHeading)
+        bot.spawn(minionHeading, "target" -> minionHeading)
         bot.set("dontFireDefensiveMissileUntil" -> (bot.time + 1))
       }
     } catch {
@@ -54,7 +54,15 @@ object ControlFunction
         bot.status("S:[" + bot.view.cellAtRelPos(heading) + "]H:[" + bot.view.cellAtRelPos(XY.apply(headingChoice.toString)) + "]" + headingChoice.toString + ".")
       }
     } catch {
-      case e: Exception => bot.move(XY.apply(0, 0))
+      case e: Exception =>
+        var target = bot.inputAsXYOrElse("collision", XY.Zero)
+        if(target != XY.Zero) {
+          target = target.negate
+          bot.set("target" -> target)
+        } else {
+          target = bot.inputAsXYOrElse("target", XY.Zero)
+        }
+        bot.move(target)
     }
   }
 }
