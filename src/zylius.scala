@@ -5,6 +5,7 @@ object ControlFunction
 {
   val goodForGoing = List('P', 'M', '_', 'B', '?', 'S')
   val goodForHunting = List('B', 'P')
+  val enemyEntities = List('b', 's', 'm')
 
   def forMaster(bot: Bot) {
     val dontFireDefensiveMissileUntil = bot.inputAsIntOrElse("dontFireDefensiveMissileUntil", -1)
@@ -21,32 +22,28 @@ object ControlFunction
     val targetIndex = bot.view.indexFromRelPos(heading)
 
     try {
-      val (shortest, distance, path) = bot.view.findPath(targetIndex)
+      val (shortest, botDistances, _) = bot.view.findPath(targetIndex)
       heading = XY.apply(bot.view.relPosFromIndex(shortest(1).toInt).toString)
       bot.move(bot.inputAsXYOrElse("heading", heading))
       bot.status("S:[" + bot.view.cellAtRelPos(heading) + "] H:[" + bot.view.cellAtRelPos(XY.apply(headingChoice.toString)) + "]" + headingChoice.toString + ".")
-    } catch {
-      case e: Exception => bot.move(XY.apply(0, 0))
-    }
 
-    try {
-      val nearestEnemySlave = bot.view.offsetToNearestInList(List('b'))
+
       val numOfMinions = bot.view.cells.filter(_ == 'S').length
-      val (_, botDistances, _) = bot.view.findPath(220, forceBot = true)
-      val enemies = bot.view.getIndexes('b')
-      val distancesToEnemies = botDistances.filter(x => enemies.contains(x._1.toInt) && x._2 < 11)
-      if(dontFireDefensiveMissileUntil < bot.time && bot.energy > 100 && nearestEnemySlave.toString != "None" && numOfMinions < distancesToEnemies.size) {
-        bot.spawn(XY.apply(bot.view.relPosFromAbsPos(XY.apply(nearestEnemySlave.toString)).toString))
+      val enemies = bot.view.getIndexes(enemyEntities)
+      val distancesToEnemies = botDistances.filter(x => enemies.contains(x._1.toInt - 1) && x._2 < 11)
+      if(dontFireDefensiveMissileUntil < bot.time && bot.energy > 100 && numOfMinions < distancesToEnemies.size && distancesToEnemies.size > 0) {
+        val minionHeading = XY.apply(bot.view.relPosFromIndex(distancesToEnemies.unzip._1.head.toInt).toString)
+        bot.spawn(minionHeading)
         bot.set("dontFireDefensiveMissileUntil" -> (bot.time + 1))
       }
     } catch {
-      case e: Exception =>
+      case e: Exception => bot.move(XY.apply(0, 0))
     }
   }
 
   def forSlave(bot: MiniBot) {
     try {
-      val headingChoice = XY.apply(bot.view.offsetToNearestInList(List('b')).toString)
+      val headingChoice = XY.apply(bot.view.offsetToNearestInList(enemyEntities).toString)
       val targetIndex = bot.view.indexFromRelPos(headingChoice)
       val (shortest, _, _) = bot.view.findPath(targetIndex)
       if(shortest.length < 4) {
@@ -121,10 +118,7 @@ class Dijkstra(graph: Graph) {
     (distance, path)
   }
 
-  /**
-   * Finds element of Q with minimum value in D, removes it
-   * from Q and returns it.
-   */
+
   protected def extractMinimum[T](Q: MutableHashSet[T], D: MutableHashMap[T, Int]): T = {
     var u = Q.first
     Q.foreach((node) =>  if(D(u) > D(node)) u = node)
@@ -132,11 +126,6 @@ class Dijkstra(graph: Graph) {
     u
   }
 
-  /**
-   * For all nodes <code>v</code> not in <code>S</code>, neighbors of
-   * <code>u</code>}: Updates shortest distances and paths, if shorter than
-   * the previous value.
-   */
   protected def relaxNeighbors(u: Node, Q: MutableHashSet[Node], S: MutableHashSet[Node],
                                D: MutableHashMap[Node, Int], P: MutableHashMap[Node, Node]): Unit = {
     for(edge <- graph.edges.filter(x => x.a == u || x.b == u)) {
@@ -445,7 +434,7 @@ case class View(cells: String) {
 
   val goodForGoing = List('P', 'M', '_', 'B', '?', 'S')
   val goodForHunting = List('B', 'P')
-  val goodForGoingBot = List('P', 'M', '_', 'B', '?', 'S', 'b')
+  val goodForGoingBot = List('P', 'M', '_', 'B', '?', 'S', 'b', 's', 'm')
 
   val size = math.sqrt(cells.length).toInt
   val center = XY(size / 2, size / 2)
@@ -472,10 +461,7 @@ case class View(cells: String) {
     }
   }
 
-  def getIndexes(char: Char) =
-    cells.zipWithIndex.filter(
-      _._1 == char
-    ).unzip._2
+  def getIndexes(chars: List[Char]) = cells.zipWithIndex.filter(x => chars.contains(x._1)).unzip._2
 
   def offsetToNearestInList(chars: List[Char]) = {
     val matchingXY = cells.view.zipWithIndex.filter(x => chars.contains(x._1))
